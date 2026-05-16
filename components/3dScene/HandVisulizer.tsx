@@ -73,9 +73,9 @@ export function HandVisualizer() {
         const kp = keypoints3D[i];
         const idx = h * JOINT_COUNT + i;
         
-        // Combine the local 3D keypoint position with the hand's world offset
+        // Combine the local 3D keypoint position (flipped for mirror) with the hand's world offset
         tempObject.position.set(
-            kp.x * scale + worldOffsetX, 
+            -kp.x * scale + worldOffsetX, 
             -kp.y * scale + worldOffsetY + offsetY, 
             kp.z * scale + offsetZ
         );
@@ -93,12 +93,12 @@ export function HandVisualizer() {
         const endKP = keypoints3D[endIdx];
         
         vStart.set(
-            startKP.x * scale + worldOffsetX, 
+            -startKP.x * scale + worldOffsetX, 
             -startKP.y * scale + worldOffsetY + offsetY, 
             startKP.z * scale + offsetZ
         );
         vEnd.set(
-            endKP.x * scale + worldOffsetX, 
+            -endKP.x * scale + worldOffsetX, 
             -endKP.y * scale + worldOffsetY + offsetY, 
             endKP.z * scale + offsetZ
         );
