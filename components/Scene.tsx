@@ -7,6 +7,7 @@ import * as THREE from 'three'
 import { useHandTracking } from "../context/HandTrackingContext";
 import MainScene from "./3dScene/MainScene";
 import { HandVisualizer } from "./3dScene/HandVisulizer";
+import TestPanel from "./3dScene/TestPanel";
 
 export default function Scene() {
   const [hasStarted, setHasStarted] = useState(false);
@@ -74,24 +75,29 @@ export default function Scene() {
 
             {/* ================= INTRO WELCOME PANEL ================= */}
             {!hasStarted ? (
-              <div className="w-80 p-8 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl text-center text-white font-sans flex flex-col items-center gap-6 animate-fade-in">
-                <h1 className="text-2xl font-semibold tracking-wide text-white/90">
-                  Apple Vision Pro
-                </h1>
+              <div className="flex justify-center items-center gap-4">
+                <div className="w-80 p-8 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl text-center text-white font-sans flex flex-col items-center gap-6 animate-fade-in">
+                  <h1 className="text-2xl font-semibold tracking-wide text-white/90">
+                    Apple Vision Pro
+                  </h1>
 
-                <div className="flex flex-col items-center gap-4">
-                  <p className="text-sm text-neutral-400">
-                    {isLoaded ? "🟢 Tracking Ready" : error ? `🔴 Error: ${error}` : "⏳ Loading AI Model..."}
-                  </p>
+                  <div className="flex flex-col items-center gap-4">
+                    <p className="text-sm text-neutral-400">
+                      {isLoaded ? "🟢 Tracking Ready" : error ? `🔴 Error: ${error}` : "⏳ Loading AI Model..."}
+                    </p>
 
-                  {isLoaded && (
-                    <button
-                      onClick={() => setHasStarted(true)}
-                      className="w-full py-3.5 px-6 rounded-full bg-white text-black font-medium tracking-wide text-sm shadow-lg hover:bg-white/90 active:scale-95 transition-all duration-200"
-                    >
-                      Let's Start
-                    </button>
-                  )}
+                    {isLoaded && (
+                      <button
+                        onClick={() => setHasStarted(true)}
+                        className="w-full py-3.5 px-6 rounded-full bg-white text-black font-medium tracking-wide text-sm shadow-lg hover:bg-white/90 active:scale-95 transition-all duration-200"
+                      >
+                        Let's Start
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="relative top-10 right-0">
+                  <TestPanel />
                 </div>
               </div>
             ) : <MainScene />
