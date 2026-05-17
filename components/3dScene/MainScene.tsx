@@ -1,5 +1,21 @@
+import { useState } from "react";
 import { CirclePlay, Mountain, Users } from "lucide-react";
 import AppIcon from "../AppIcon";
+
+function DockButton({ children }: { children: React.ReactNode }) {
+  const [isHovered, setIsHovered] = useState(false);
+  return (
+    <button 
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 active:scale-95 ${
+        isHovered ? 'bg-white/30' : 'bg-transparent'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function MainScene () {
   return (
@@ -8,17 +24,17 @@ export default function MainScene () {
      {/* ================= LEFT VERTICAL DOCK ================= */}
      <div className="flex flex-col gap-5 p-3 rounded-full bg-gray-900/70 backdrop-blur-2xl border border-white/10 shadow-xl">
        {/* Dock Item 1 */}
-       <button className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 hover:bg-white/30 active:scale-95">
+       <DockButton>
          <span className="text-white text-xl"><CirclePlay /></span>
-       </button>
+       </DockButton>
        {/* Dock Item 2 */}
-       <button className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 hover:bg-white/30 active:scale-95">
+       <DockButton>
          <span className="text-white text-xl"><Users /></span>
-       </button>
+       </DockButton>
        {/* Dock Item 3 */}
-       <button className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 hover:bg-white/30 active:scale-95">
+       <DockButton>
          <span className="text-white text-xl"><Mountain /></span>
-       </button>
+       </DockButton>
      </div>
 
      {/* ================= MAIN INTERFACE AREA ================= */}

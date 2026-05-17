@@ -22,7 +22,7 @@ export function HandVisualizer() {
   const { handsRef } = useHandTracking();
   const jointMeshRef = useRef<THREE.InstancedMesh>(null);
   const boneMeshRef = useRef<THREE.InstancedMesh>(null);
-  const laserMeshRef = useRef<THREE.InstancedMesh>(null);
+  const cursorMeshRef = useRef<THREE.InstancedMesh>(null);
 
   const tempObject = useMemo(() => new THREE.Object3D(), []);
 
@@ -36,27 +36,6 @@ export function HandVisualizer() {
 
   const tempColor = useMemo(() => new THREE.Color(), []);
 
-  // Generate a premium fading gradient texture for the laser beam
-  const fadeTexture = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      // CylinderGeometry UV: y=0 is bottom (base), y=1 is top (tip)
-      // Canvas Y: 0 is top, 256 is bottom.
-      // So canvas top (0) maps to tip, canvas bottom (256) maps to base.
-      const gradient = ctx.createLinearGradient(0, 0, 0, 256);
-      gradient.addColorStop(0, 'rgba(255, 255, 255, 0)'); // Tip: completely transparent
-      gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)'); // Mid: highly transparent
-      gradient.addColorStop(1, 'rgba(255, 255, 255, 1)'); // Base: fully opaque
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 2, 256);
-    }
-    const tex = new THREE.CanvasTexture(canvas);
-    return tex;
-  }, []);
-
   // Store previous frames' data to apply Exponential Moving Average (EMA) smoothing
   const smoothingRef = useRef<{ origin: THREE.Vector3, dir: THREE.Vector3 }[]>([
     { origin: new THREE.Vector3(), dir: new THREE.Vector3() },
@@ -65,33 +44,41 @@ export function HandVisualizer() {
 
   // Interaction State
   const isPinchingRef = useRef<boolean[]>([false, false]);
-  const hoveredElementRef = useRef<Element | null>(null);
+  const hoveredElementRef = useRef<(Element | null)[]>([null, null]);
 
   useFrame((state) => {
     const hands = handsRef.current;
 
-    if (!jointMeshRef.current || !boneMeshRef.current || !laserMeshRef.current) return;
+    if (!jointMeshRef.current || !boneMeshRef.current || !cursorMeshRef.current) return;
 
     if (!hands || hands.length === 0) {
       jointMeshRef.current.count = 0;
       boneMeshRef.current.count = 0;
-      laserMeshRef.current.count = 0;
+      cursorMeshRef.current.count = 0;
 
       // Reset smoothing data when hands are lost
       smoothingRef.current[0].origin.set(0, 0, 0);
       smoothingRef.current[1].origin.set(0, 0, 0);
 
-      // Clear hover state
-      if (hoveredElementRef.current) {
-        hoveredElementRef.current.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
-        hoveredElementRef.current = null;
+      // Reset previous pinch tracking
+      isPinchingRef.current[0] = false;
+      isPinchingRef.current[1] = false;
+
+      // Clear hover state for both hands
+      for (let h = 0; h < 2; h++) {
+        const hoverd = hoveredElementRef.current[h];
+        if (hoverd) {
+          hoverd.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+          hoverd.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false }));
+          hoveredElementRef.current[h] = null;
+        }
       }
       return;
     }
 
     jointMeshRef.current.count = hands.length * JOINT_COUNT;
     boneMeshRef.current.count = hands.length * BONE_COUNT;
-    laserMeshRef.current.count = hands.length;
+    cursorMeshRef.current.count = hands.length;
 
     // Config for Vision Pro style placement
     const scale = 5.5;
@@ -189,11 +176,7 @@ export function HandVisualizer() {
       // --- PINCH DETECTION ---
       // Measure the physical 3D distance between the thumb and index finger tips
       const pinchDistance = vThumbTip.distanceTo(vIndexTip);
-      const isPinching = pinchDistance < 0.20; // The threshold for a "click"
-
-      // Visually indicate pinch by turning the laser red
-      tempColor.setHex(isPinching ? 0xff0000 : 0xffffff);
-      laserMeshRef.current.setColorAt(h, tempColor);
+      const isPinching = pinchDistance < 0.25; // The threshold for a "click"
 
       // Raw Target Data
       vMidpoint.addVectors(vThumbTip, vIndexTip).multiplyScalar(0.5);
@@ -214,57 +197,88 @@ export function HandVisualizer() {
         smoothed.dir.lerp(vDir, 0.1).normalize();
       }
 
-      const laserLength = 10;
-
-      // Apply the highly stabilized smoothed data to the geometry
-      tempObject.position.copy(smoothed.origin).addScaledVector(smoothed.dir, laserLength / 2);
-      tempObject.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), smoothed.dir);
-      tempObject.scale.set(1, 1, 1);
-      tempObject.updateMatrix();
-
-      laserMeshRef.current.setMatrixAt(h, tempObject.matrix);
-
       // --- HTML INTERACTION (RAYCASTING TO DOM) ---
       // Define the virtual UI plane (z = -4, facing +z) to match the <Html> component in Scene.tsx
       const uiPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 4);
       const ray = new THREE.Ray(smoothed.origin, smoothed.dir);
       const intersectPoint = new THREE.Vector3();
 
+      let hasIntersection = false;
+
       if (ray.intersectPlane(uiPlane, intersectPoint)) {
+        hasIntersection = true;
+
         // Project 3D collision point to Normalized Device Coordinates (NDC) using the camera
-        intersectPoint.project(state.camera);
+        // Clone first to prevent mutating intersectPoint which we need for 3D cursor positioning
+        const ndcPoint = intersectPoint.clone().project(state.camera);
 
         // Convert NDC (-1 to 1) to 2D screen pixels
-        const domX = (intersectPoint.x + 1) / 2 * window.innerWidth;
-        const domY = -(intersectPoint.y - 1) / 2 * window.innerHeight;
+        const domX = (ndcPoint.x + 1) / 2 * window.innerWidth;
+        const domY = -(ndcPoint.y - 1) / 2 * window.innerHeight;
 
         // Find the topmost actual HTML DOM element at this specific screen coordinate
         const element = document.elementFromPoint(domX, domY);
 
-        // Handle Hover States (Trigger CSS :hover effects via JS)
-        if (element !== hoveredElementRef.current) {
-          if (hoveredElementRef.current) {
-            hoveredElementRef.current.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true, clientX: domX, clientY: domY }));
+        // Handle Hover States (Trigger CSS :hover effects via JS and satisfy React's synthetic event listeners)
+        const hoverd = hoveredElementRef.current[h];
+        if (element !== hoverd) {
+          if (hoverd) {
+            // React uses mouseout/mouseover to generate synthetic onMouseEnter/onMouseLeave
+            hoverd.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, clientX: domX, clientY: domY }));
+            hoverd.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false, clientX: domX, clientY: domY }));
           }
           if (element) {
-            element.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, clientX: domX, clientY: domY }));
+            element.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: domX, clientY: domY }));
+            element.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false, clientX: domX, clientY: domY }));
+            element.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: domX, clientY: domY }));
           }
-          hoveredElementRef.current = element;
+          hoveredElementRef.current[h] = element;
+        } else if (element) {
+          // Continuously dispatch mousemove while hovering to keep coordinate tracking updated
+          element.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: domX, clientY: domY }));
         }
 
-        // Handle Click Event (Trigger React onClick)
+        // Handle Click Event (Complete Mouse click lifecycle: mousedown -> mouseup -> click)
         if (isPinching && !isPinchingRef.current[h]) {
           if (element) {
-            // Dispatch a genuine DOM click event
+            element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: domX, clientY: domY }));
+          }
+        } else if (!isPinching && isPinchingRef.current[h]) {
+          if (element) {
+            element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: domX, clientY: domY }));
             element.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: domX, clientY: domY }));
           }
         }
+
+        // Position the Spatial Cursor exactly on the UI plane (offset slightly to avoid z-fighting)
+        tempObject.position.copy(intersectPoint);
+        tempObject.position.z += 0.02; // Bring slightly forward of z = -4
+
+        // Premium touch: shrink the cursor slightly when pinching (tactile feedback)
+        const scaleSize = isPinching ? 0.6 : 1.0;
+        tempObject.scale.set(scaleSize, scaleSize, scaleSize);
+        tempObject.rotation.set(0, 0, 0);
+        tempObject.updateMatrix();
+
+        cursorMeshRef.current.setMatrixAt(h, tempObject.matrix);
+
+        // Visually indicate pinch by turning the cursor red
+        tempColor.setHex(isPinching ? 0xff0000 : 0xffffff);
+        cursorMeshRef.current.setColorAt(h, tempColor);
       } else {
         // Ray missed the plane entirely, clear hover
-        if (hoveredElementRef.current) {
-          hoveredElementRef.current.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
-          hoveredElementRef.current = null;
+        const hoverd = hoveredElementRef.current[h];
+        if (hoverd) {
+          hoverd.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+          hoverd.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false }));
+          hoveredElementRef.current[h] = null;
         }
+
+        // Hide the cursor by scaling to 0
+        tempObject.position.set(0, 0, 0);
+        tempObject.scale.set(0, 0, 0);
+        tempObject.updateMatrix();
+        cursorMeshRef.current.setMatrixAt(h, tempObject.matrix);
       }
 
       // Update previous pinch state for this hand to prevent double-clicking
@@ -273,11 +287,11 @@ export function HandVisualizer() {
 
     jointMeshRef.current.instanceMatrix.needsUpdate = true;
     boneMeshRef.current.instanceMatrix.needsUpdate = true;
-    laserMeshRef.current.instanceMatrix.needsUpdate = true;
+    cursorMeshRef.current.instanceMatrix.needsUpdate = true;
 
     // Crucial: tell ThreeJS to update the instance colors we set
-    if (laserMeshRef.current.instanceColor) {
-      laserMeshRef.current.instanceColor.needsUpdate = true;
+    if (cursorMeshRef.current.instanceColor) {
+      cursorMeshRef.current.instanceColor.needsUpdate = true;
     }
   });
 
@@ -309,17 +323,16 @@ export function HandVisualizer() {
         />
       </instancedMesh>
 
-      {/* The Laser Pointer (Fading Light Beam) */}
-      <instancedMesh ref={laserMeshRef} args={[undefined, undefined, MAX_HANDS]} frustumCulled={false}>
-        {/* Length = 10, thinner for elegance */}
-        <cylinderGeometry args={[0.002, 0.002, 10, 8]} />
+      {/* The Spatial Cursor (Vision Pro style ring) */}
+      <instancedMesh ref={cursorMeshRef} args={[undefined, undefined, MAX_HANDS]} frustumCulled={false}>
+        <ringGeometry args={[0.015, 0.025, 32]} />
         <meshBasicMaterial
           color="#ffffff"
           transparent
-          opacity={0.8}
+          opacity={0.9}
           depthWrite={false}
-          alphaMap={fadeTexture}
           blending={THREE.AdditiveBlending}
+          side={THREE.DoubleSide}
         />
       </instancedMesh>
     </>

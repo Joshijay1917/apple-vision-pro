@@ -89,15 +89,16 @@ export default function Scene() {
                     {isLoaded && (
                       <button
                         onClick={() => setHasStarted(true)}
-                        className="w-full py-3.5 px-6 rounded-full bg-white text-black font-medium tracking-wide text-sm shadow-lg hover:bg-white/90 active:scale-95 transition-all duration-200"
+                        className="w-full py-3.5 px-6 rounded-full bg-white text-black font-medium tracking-wide text-sm shadow-lg hover:bg-white/50 active:scale-95 transition-all duration-200"
                       >
                         Let's Start
                       </button>
                     )}
                   </div>
                 </div>
-                <div className="relative top-10 right-0">
-                  <TestPanel />
+                <div className="animate-fade-in">
+                  {/* <TestPanel /> */}
+                  <MainScene />
                 </div>
               </div>
             ) : <MainScene />
