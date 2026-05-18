@@ -32,6 +32,7 @@ export function HandVisualizer() {
   const vIndexPip = useMemo(() => new THREE.Vector3(), []);
   const vIndexTip = useMemo(() => new THREE.Vector3(), []);
   const vThumbTip = useMemo(() => new THREE.Vector3(), []);
+  const vThumbPip = useMemo(() => new THREE.Vector3(), []);
   const vMidpoint = useMemo(() => new THREE.Vector3(), []);
 
   const tempColor = useMemo(() => new THREE.Color(), []);
@@ -156,11 +157,17 @@ export function HandVisualizer() {
       const thumbTipKP = keypoints3D[4]; // Thumb Tip
       const indexPipKP = keypoints3D[6]; // Index PIP
       const indexTipKP = keypoints3D[8]; // Index Tip
+      const thumbPipKP = keypoints3D[2]; // Thumb PIP
 
       vThumbTip.set(
         -thumbTipKP.x * scale + worldOffsetX,
         -thumbTipKP.y * scale + worldOffsetY + offsetY,
         thumbTipKP.z * scale + offsetZ
+      );
+      vThumbPip.set(
+        -thumbPipKP.x * scale + worldOffsetX,
+        -thumbPipKP.y * scale + worldOffsetY + offsetY,
+        thumbPipKP.z * scale + offsetZ
       );
       vIndexPip.set(
         -indexPipKP.x * scale + worldOffsetX,
@@ -177,10 +184,14 @@ export function HandVisualizer() {
       // Measure the physical 3D distance between the thumb and index finger tips
       const pinchDistance = vThumbTip.distanceTo(vIndexTip);
       const isPinching = pinchDistance < 0.25; // The threshold for a "click"
+      const midPip = new THREE.Vector3();
+      const midTip = new THREE.Vector3();
+      midPip.addVectors(vThumbPip, vIndexPip).multiplyScalar(0.5);
+      midTip.addVectors(vIndexTip, vThumbTip).multiplyScalar(0.5);
 
       // Raw Target Data
       vMidpoint.addVectors(vThumbTip, vIndexTip).multiplyScalar(0.5);
-      vDir.subVectors(vIndexTip, vIndexPip).normalize();
+      vDir.subVectors(midTip, midPip).normalize();
 
       const smoothed = smoothingRef.current[h];
 
