@@ -39,6 +39,9 @@ export default function SafariBrowser({
   const handOffset = useRef(new THREE.Vector3());
   const needsMouseOffsetInit = useRef(false);
   
+  const isClick = useRef(false);
+  const isMouseEntered = useRef(false);
+  
   // Two-hand scaling references
   const isTwoHandScaling = useRef(false);
   const initialHandDistance = useRef(0);
@@ -101,14 +104,11 @@ export default function SafariBrowser({
   };
 
   // Drag and focus interaction triggers
-  const handleDragStart = (e: any) => {
-    e.stopPropagation();
+  const handleDragStart = (e?: any) => {
+    if (e) e.stopPropagation();
     setFocusedBrowserId(id); // Target window focus
     
-    // Disable dragging with HandVisualizers (simulated pointer events are untrusted)
-    if (e.nativeEvent && !e.nativeEvent.isTrusted) {
-      return;
-    }
+
     
     isDragging.current = true;
     
@@ -174,16 +174,31 @@ export default function SafariBrowser({
     dragSource.current = null;
   };
 
-  // Listen for global pointer ups to secure mouse drag releases
-  useEffect(() => {
-    const handleGlobalPointerUp = () => {
-      if (dragSource.current?.type === 'mouse') {
-        isDragging.current = false;
-        dragSource.current = null;
+  const checkDragState = () => {
+    if (isClick.current && isMouseEntered.current) {
+      if (!isDragging.current) {
+        handleDragStart();
       }
+    } else {
+      if (isDragging.current) {
+        handleDragEnd();
+      }
+    }
+  };
+
+  // Listen for global pointer ups and mouse ups to secure mouse drag releases
+  useEffect(() => {
+    const handleGlobalRelease = () => {
+      isClick.current = false;
+      isMouseEntered.current = false;
+      checkDragState();
     };
-    window.addEventListener('pointerup', handleGlobalPointerUp);
-    return () => window.removeEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointerup', handleGlobalRelease);
+    window.addEventListener('mouseup', handleGlobalRelease);
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalRelease);
+      window.removeEventListener('mouseup', handleGlobalRelease);
+    };
   }, []);
 
   // Set initial position and scale from props
@@ -319,8 +334,15 @@ export default function SafariBrowser({
         pointerEvents="auto"
         className="font-sans select-none"
       >
-        <div 
-          onClick={() => setFocusedBrowserId(id)}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onMouseUp={(e) => e.stopPropagation()}
+        >
+          <div 
+            onClick={() => setFocusedBrowserId(id)}
           className={`w-[680px] h-[460px] rounded-3xl overflow-hidden bg-gray-950/90 border border-white/10 flex flex-col shadow-2xl transition-all duration-300 pointer-events-auto ${
             isFocused 
               ? "ring-2 ring-sky-500/50 shadow-[0_0_40px_rgba(56,189,248,0.25)] border-sky-400/40" 
@@ -329,9 +351,7 @@ export default function SafariBrowser({
         >
           {/* ================= HEADER BAR (DRAG BAR) ================= */}
           <div 
-            onPointerDown={handleDragStart}
-            onPointerUp={handleDragEnd}
-            className="h-14 bg-gray-900/60 border-b border-white/5 px-4 flex items-center justify-between shrink-0 cursor-grab active:cursor-grabbing hover:bg-gray-900/80 transition-colors duration-200 select-none"
+            className="h-14 bg-gray-900/60 border-b border-white/5 px-4 flex items-center justify-between shrink-0 hover:bg-gray-900/80 transition-colors duration-200 select-none"
           >
             {/* Windows traffic light controls */}
             <div className="flex items-center gap-2" onPointerDown={(e) => e.stopPropagation()}>
@@ -422,17 +442,62 @@ export default function SafariBrowser({
         </div>
 
         {/* ================= BOTTOM OS HOME DRAG INDICATOR HANDLE ================= */}
-        <div 
-          onPointerDown={handleDragStart}
-          onPointerUp={handleDragEnd}
-          className="w-full flex justify-center mt-3 cursor-grab active:cursor-grabbing select-none"
-        >
-          <div className={`w-32 h-2 rounded-full border border-white/5 shadow-lg transition-all duration-300 hover:scale-x-105 active:scale-x-95 ${
-            isFocused 
-              ? "bg-sky-400/80 shadow-[0_0_15px_rgba(56,189,248,0.5)] scale-x-105 border-sky-400/20" 
-              : "bg-white/15"
-          }`} />
+        <div className="w-full flex justify-center mt-3 select-none" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+          <div 
+            onPointerEnter={() => {
+              isMouseEntered.current = true;
+              checkDragState();
+            }}
+            onPointerLeave={() => {
+              if (!isDragging.current) {
+                isMouseEntered.current = false;
+                checkDragState();
+              }
+            }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              setFocusedBrowserId(id);
+              isClick.current = true;
+              checkDragState();
+            }}
+            onPointerUp={(e) => {
+              e.stopPropagation();
+              isClick.current = false;
+              isMouseEntered.current = false;
+              checkDragState();
+            }}
+            onMouseEnter={() => {
+              isMouseEntered.current = true;
+              checkDragState();
+            }}
+            onMouseLeave={() => {
+              if (!isDragging.current) {
+                isMouseEntered.current = false;
+                checkDragState();
+              }
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setFocusedBrowserId(id);
+              isClick.current = true;
+              checkDragState();
+            }}
+            onMouseUp={(e) => {
+              e.stopPropagation();
+              isClick.current = false;
+              isMouseEntered.current = false;
+              checkDragState();
+            }}
+            className="w-[580px] h-16 flex items-center justify-center cursor-grab active:cursor-grabbing"
+          >
+            <div className={`w-32 h-2 rounded-full border border-white/5 shadow-lg transition-all duration-300 pointer-events-none hover:scale-x-105 active:scale-x-95 ${
+              isFocused 
+                ? "bg-sky-400/80 shadow-[0_0_15px_rgba(56,189,248,0.5)] scale-x-105 border-sky-400/20" 
+                : "bg-white/15"
+            }`} />
+          </div>
         </div>
+      </div>
       </Html>
     </group>
   );

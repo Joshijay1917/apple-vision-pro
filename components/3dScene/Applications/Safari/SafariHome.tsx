@@ -49,7 +49,7 @@ export default function SafariHome({ onNavigate }: SafariHomeProps) {
     {
       label: "YouTube Player",
       desc: "Relaxing Lo-Fi Stream",
-      url: "https://www.youtube.com/embed/lP157TMn-x8", // Relaxing Lo-Fi / Synthwave ambient
+      url: "https://www.youtube.com/embed/Sf4oFaelTr4", // Relaxing Lo-Fi / Synthwave ambient
       icon: <PlaySquare className="w-6 h-6 text-rose-400" />,
       color: "from-rose-500/20 to-red-600/10 border-rose-500/30"
     }

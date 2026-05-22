@@ -20,6 +20,22 @@ export default function Scene() {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    const handleCanvasClick = (e: MouseEvent) => {
+      // Only lock pointer if it is a genuine, trusted user gesture click
+      if (e.isTrusted) {
+        const canvas = document.querySelector('canvas');
+        if (canvas && e.target === canvas) {
+          canvas.requestPointerLock();
+        }
+      }
+    };
+    document.addEventListener('click', handleCanvasClick);
+    return () => {
+      document.removeEventListener('click', handleCanvasClick);
+    };
+  }, []);
+
   const trackingValue = useHandTracking();
   const { hands, isLoaded, error } = trackingValue;
   const { activeEnv, setActiveEnv } = useScene();
@@ -72,7 +88,7 @@ export default function Scene() {
         }}
       >
 
-        <PointerLockControls />
+        <PointerLockControls selector="#none" />
         <ambientLight intensity={1.5} />
         <pointLight position={[0, 0, 1]} intensity={2} />
 
@@ -91,7 +107,14 @@ export default function Scene() {
           pointerEvents="auto"
         >
           {/* Global wrapper with a smooth CSS opacity fade transition */}
-          <div className="transition-opacity duration-1000 ease-in-out">
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onMouseUp={(e) => e.stopPropagation()}
+            className="transition-opacity duration-1000 ease-in-out"
+          >
 
             {/* ================= INTRO WELCOME PANEL ================= */}
             <div className="flex flex-col justify-center items-center gap-10">
