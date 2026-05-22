@@ -16,6 +16,10 @@ interface ApplicationContextType {
   closeBrowser: (id: string) => void;
   setFocusedBrowserId: (id: string | null) => void;
   updateBrowserURL: (id: string, url: string) => void;
+  spatialCreatorOpen: boolean;
+  setSpatialCreatorOpen: (open: boolean) => void;
+  spatialCreatorShape: "cube" | "sphere" | "cylinder";
+  setSpatialCreatorShape: (shape: "cube" | "sphere" | "cylinder") => void;
 }
 
 export const ApplicationContext = createContext<ApplicationContextType | undefined>(undefined);
@@ -23,6 +27,8 @@ export const ApplicationContext = createContext<ApplicationContextType | undefin
 export function ApplicationProvider({ children }: { children: React.ReactNode }) {
   const [browsers, setBrowsers] = useState<BrowserInstance[]>([]);
   const [focusedBrowserId, setFocusedBrowserId] = useState<string | null>(null);
+  const [spatialCreatorOpen, setSpatialCreatorOpen] = useState(false);
+  const [spatialCreatorShape, setSpatialCreatorShape] = useState<"cube" | "sphere" | "cylinder">("cube");
 
   const spawnBrowser = (url: string = "home") => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -60,7 +66,11 @@ export function ApplicationProvider({ children }: { children: React.ReactNode })
       spawnBrowser,
       closeBrowser,
       setFocusedBrowserId,
-      updateBrowserURL
+      updateBrowserURL,
+      spatialCreatorOpen,
+      setSpatialCreatorOpen,
+      spatialCreatorShape,
+      setSpatialCreatorShape
     }}>
       {children}
     </ApplicationContext.Provider>

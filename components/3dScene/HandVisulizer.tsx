@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { useHandTracking } from "@/context/HandTrackingContext";
 import { useApplication } from "@/context/ApplicationContext";
+import { useScene } from "@/context/SceneContext";
 import { Html } from "@react-three/drei";
 
 const BONE_PAIRS = [
@@ -23,6 +24,7 @@ const MAX_HANDS = 2;
 export function HandVisualizer() {
   const { handsRef, isMobile } = useHandTracking();
   const { focusedBrowserId } = useApplication();
+  const { handSkeletonVisible } = useScene();
   const jointMeshRef = useRef<THREE.InstancedMesh>(null);
   const boneMeshRef = useRef<THREE.InstancedMesh>(null);
   const cursorMeshRef = useRef<THREE.InstancedMesh>(null);
@@ -105,8 +107,8 @@ export function HandVisualizer() {
       return;
     }
 
-    jointMeshRef.current.count = hands.length * JOINT_COUNT;
-    boneMeshRef.current.count = hands.length * BONE_COUNT;
+    jointMeshRef.current.count = handSkeletonVisible ? hands.length * JOINT_COUNT : 0;
+    boneMeshRef.current.count = handSkeletonVisible ? hands.length * BONE_COUNT : 0;
     cursorMeshRef.current.count = hands.length;
 
     // Config for Vision Pro style placement

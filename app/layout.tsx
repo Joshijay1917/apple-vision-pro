@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Script from "next/script";
 import LayoutWrapper from "@/components/LayoutWrapper";
+import { HandTrackingProvider } from "@/context/HandTrackingContext";
 import { SceneProvider } from "@/context/SceneContext";
 import { ApplicationProvider } from "@/context/ApplicationContext";
 
@@ -37,13 +38,15 @@ export default function RootLayout({
         <Script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands" strategy="beforeInteractive" />
         <Script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/hand-pose-detection" strategy="beforeInteractive" />
 
-        <LayoutWrapper>
-          <SceneProvider>
-            <ApplicationProvider>
-              {children}
-            </ApplicationProvider>
-          </SceneProvider>
-        </LayoutWrapper>
+        <HandTrackingProvider>
+          <LayoutWrapper>
+            <SceneProvider>
+              <ApplicationProvider>
+                {children}
+              </ApplicationProvider>
+            </SceneProvider>
+          </LayoutWrapper>
+        </HandTrackingProvider>
 
       </body>
     </html>

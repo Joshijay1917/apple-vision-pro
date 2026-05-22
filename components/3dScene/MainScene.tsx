@@ -3,6 +3,7 @@ import { CirclePlay, Mountain, Users } from "lucide-react";
 import AppIcon from "../AppIcon";
 import Envs from "./Environments/Envs";
 import SpatialCreatorUI from "./Applications/SpatialCreator/SpatialCreatorUI";
+import SettingsUI from "./Applications/Settings/SettingsUI";
 import { useApplication } from "@/context/ApplicationContext";
 
 function DockButton({ children, onClick, isActive }: { children: React.ReactNode, onClick: () => void, isActive: boolean }) {
@@ -29,14 +30,49 @@ export default function MainScene({
   setActiveEnv: (env: string) => void;
   spawnBrowser: (url: string) => void;
 }) {
-  const [sidePanelOpen, setSidePanelOpen] = useState<'main' | 'users' | 'env' | 'SpatialCreator'>('main');
+  const [sidePanelOpen, setSidePanelOpen] = useState<'main' | 'users' | 'env' | 'SpatialCreator' | 'Settings'>('main');
+  const { setSpatialCreatorOpen } = useApplication();
+  const [comingSoonApp, setComingSoonApp] = useState<string | null>(null);
+
+  const triggerComingSoon = (appName: string) => {
+    setComingSoonApp(appName);
+  };
+
+  useEffect(() => {
+    if (comingSoonApp) {
+      const timer = setTimeout(() => {
+        setComingSoonApp(null);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [comingSoonApp]);
+
+  useEffect(() => {
+    setSpatialCreatorOpen(sidePanelOpen === 'SpatialCreator');
+    return () => {
+      setSpatialCreatorOpen(false);
+    };
+  }, [sidePanelOpen, setSpatialCreatorOpen]);
 
   return (
     <div className="flex items-center gap-10 font-sans select-none pointer-events-auto animate-fade-in relative min-h-[300px] justify-center">
+      {comingSoonApp && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 flex items-center justify-center pointer-events-none animate-fade-in">
+          <div className="px-6 py-4 rounded-2xl bg-gray-900/85 backdrop-blur-2xl border border-white/10 shadow-2xl flex items-center gap-3 text-white pointer-events-auto">
+            <span className="text-xl animate-pulse">✨</span>
+            <div className="flex flex-col text-left">
+              <span className="text-sm font-semibold tracking-wide text-white">{comingSoonApp}</span>
+              <span className="text-[10px] text-white/50 tracking-wider uppercase font-medium">Coming Soon to Spatial OS</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ================= DETACHED SPATIAL CREATOR INTERFACE ================= */}
       {sidePanelOpen === 'SpatialCreator' ? (
         <SpatialCreatorUI openPanel={sidePanelOpen} setOpenPanel={setSidePanelOpen} />
+      ) : sidePanelOpen === 'Settings' ? (
+        <SettingsUI setOpenPanel={setSidePanelOpen} />
       ) : (
         <>
           {/* ================= LEFT VERTICAL DOCK ================= */}
@@ -64,10 +100,10 @@ export default function MainScene({
               <div className="flex flex-col gap-8 items-center">
                 {/* ROW 1: 4 Items */}
                 <div className="flex gap-8 justify-center">
-                  <AppIcon label="TV" src="/icons/tv.png" />
-                  <AppIcon label="Music" src="/icons/Music.png" />
-                  <AppIcon label="Mindfulness" src="/icons/Mindfulness.png" />
-                  <AppIcon label="Settings" src="/icons/settings.png" />
+                  <AppIcon label="TV" src="/icons/tv.png" onClick={() => triggerComingSoon("TV")} />
+                  <AppIcon label="Music" src="/icons/Music.png" onClick={() => triggerComingSoon("Music")} />
+                  <AppIcon label="Mindfulness" src="/icons/Mindfulness.png" onClick={() => triggerComingSoon("Mindfulness")} />
+                  <AppIcon label="Settings" src="/icons/settings.png" onClick={() => setSidePanelOpen("Settings")} />
                 </div>
 
                 {/* ROW 2: 5 Items */}
@@ -83,17 +119,17 @@ export default function MainScene({
                     src="/icons/safari.png"
                     onClick={() => spawnBrowser("home")}
                   />
-                  <AppIcon label="Photos" src="/icons/photos.png" />
-                  <AppIcon label="Key notes" src="/icons/Keynotes.png" />
-                  <AppIcon label="App Store" src="/icons/appstore.png" />
+                  <AppIcon label="Photos" src="/icons/photos.png" onClick={() => triggerComingSoon("Photos")} />
+                  <AppIcon label="Key notes" src="/icons/Keynotes.png" onClick={() => triggerComingSoon("Key Notes")} />
+                  <AppIcon label="App Store" src="/icons/appstore.png" onClick={() => triggerComingSoon("App Store")} />
                 </div>
 
                 {/* ROW 3: 4 Items */}
                 <div className="flex gap-8 justify-center">
-                  <AppIcon label="Mail" src="/icons/mail.png" />
-                  <AppIcon label="Messages" src="/icons/messages.png" />
-                  <AppIcon label="Notes" src="/icons/notes.png" />
-                  <AppIcon label="More Apps" src="/icons/apps.png" />
+                  <AppIcon label="Mail" src="/icons/mail.png" onClick={() => triggerComingSoon("Mail")} />
+                  <AppIcon label="Messages" src="/icons/messages.png" onClick={() => triggerComingSoon("Messages")} />
+                  <AppIcon label="Notes" src="/icons/notes.png" onClick={() => triggerComingSoon("Notes")} />
+                  <AppIcon label="More Apps" src="/icons/apps.png" onClick={() => triggerComingSoon("More Apps")} />
                 </div>
               </div>
 

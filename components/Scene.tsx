@@ -3,12 +3,12 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { createPortal } from "react-dom";
 import { Environment, Html, PointerLockControls } from "@react-three/drei";
 import * as THREE from 'three'
-import { useHandTracking } from "@/context/HandTrackingContext";
-import { useScene } from "@/context/SceneContext";
+import { useHandTracking, HandTrackingContext } from "@/context/HandTrackingContext";
+import { useScene, SceneContext } from "@/context/SceneContext";
 import MainScene from "./3dScene/MainScene";
 import { HandVisualizer } from "./3dScene/HandVisulizer";
 import SpatialCreator from "./3dScene/Applications/SpatialCreator/SpatialCreator";
-import { useApplication } from "@/context/ApplicationContext";
+import { useApplication, ApplicationContext } from "@/context/ApplicationContext";
 import SafariBrowser from "./3dScene/Applications/Safari/SafariBrowser";
 import { StereoRenderer } from "./3dScene/StereoRenderer";
 import { DeviceOrientationController } from "./3dScene/DeviceOrientationController";
@@ -40,8 +40,10 @@ export default function Scene() {
 
   const trackingValue = useHandTracking();
   const { hands, isLoaded, error, isMobile } = trackingValue;
-  const { activeEnv, setActiveEnv } = useScene();
-  const { browsers, spawnBrowser, closeBrowser } = useApplication();
+  const sceneValue = useScene();
+  const { activeEnv, setActiveEnv, ambientIntensity, pointIntensity } = sceneValue;
+  const appValue = useApplication();
+  const { browsers, spawnBrowser, closeBrowser, spatialCreatorOpen, spatialCreatorShape } = appValue;
   const [status, setStatus] = useState("Initializing...");
   const [isVRActive, setIsVRActive] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
@@ -91,91 +93,109 @@ export default function Scene() {
           depth: true
         }}
       >
+        <HandTrackingContext.Provider value={trackingValue}>
+          <SceneContext.Provider value={sceneValue}>
+            <ApplicationContext.Provider value={appValue}>
 
-        {!isMobile && <PointerLockControls selector="#none" />}
-        {isMobile && isVRActive && (
-          <>
-            <StereoRenderer />
-            <DeviceOrientationController />
-          </>
-        )}
-        <ambientLight intensity={1.5} />
-        <pointLight position={[0, 0, 1]} intensity={2} />
-
-        {/* 1. HDRI ENVIRONMENT: Only renders when started so it fades in naturally */}
-        {hasStarted && (
-          <FadingEnvironment
-            files={activeEnv}
-          />
-        )}
-
-        {/* 2. THE FLOATING INTERFACE */}
-        <Html
-          position={[0, 0, -4]}
-          transform
-          distanceFactor={2.5}
-          pointerEvents="auto"
-        >
-          {/* Global wrapper with a smooth CSS opacity fade transition */}
-          <div
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-            onPointerUp={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onMouseUp={(e) => e.stopPropagation()}
-            className="transition-opacity duration-1000 ease-in-out"
-          >
-
-            {/* ================= INTRO WELCOME PANEL ================= */}
-            <div className="flex flex-col justify-center items-center gap-10">
-              {!hasStarted && !isMobile && (
-                <div className="w-200 p-5 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl text-center text-white font-sans flex justify-between items-center gap-6 animate-fade-in">
-                  <h1 className="text-2xl font-semibold tracking-wide text-white/90">
-                    Apple Vision Pro
-                  </h1>
-
-                  <div className="flex w-1/2 justify-between items-center gap-4">
-                    <p className="text-sm text-neutral-400 text-nowrap">
-                      {isLoaded ? "🟢 Tracking Ready" : error ? `🔴 Error: ${error}` : "⏳ Loading AI Model..."}
-                    </p>
-
-                    {isLoaded && (
-                      <button
-                        onClick={() => setHasStarted(true)}
-                        className="w-full py-3.5 px-6 rounded-full bg-white text-black font-medium tracking-wide text-sm shadow-lg hover:bg-white/50 active:scale-95 transition-all duration-200"
-                      >
-                        Let's Start
-                      </button>
-                    )}
-                  </div>
-                </div>
+              {!isMobile && <PointerLockControls selector="#none" />}
+              {isMobile && isVRActive && (
+                <>
+                  <StereoRenderer />
+                  <DeviceOrientationController />
+                </>
               )}
-              {!isMobile && <div className="animate-fade-in">
-                {/* <TestPanel /> */}
-                <MainScene
-                  activeEnv={activeEnv}
-                  setActiveEnv={setActiveEnv}
-                  spawnBrowser={spawnBrowser}
+              <ambientLight intensity={ambientIntensity} />
+              <pointLight position={[0, 0, 1]} intensity={pointIntensity} />
+
+              {/* 1. HDRI ENVIRONMENT: Only renders when started so it fades in naturally */}
+              {hasStarted && (
+                <FadingEnvironment
+                  files={activeEnv}
                 />
-              </div>}
-            </div>
+              )}
 
-          </div>
-        </Html>
+              {/* 2. THE FLOATING INTERFACE */}
+              <Html
+                position={[0, 0, -4]}
+                transform
+                distanceFactor={2.5}
+                pointerEvents="auto"
+              >
+                <HandTrackingContext.Provider value={trackingValue}>
+                  <SceneContext.Provider value={sceneValue}>
+                    <ApplicationContext.Provider value={appValue}>
+                      {/* Global wrapper with a smooth CSS opacity fade transition */}
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerUp={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onMouseUp={(e) => e.stopPropagation()}
+                        className="transition-opacity duration-1000 ease-in-out"
+                      >
 
-        <HandVisualizer />
-        {browsers.map((browser) => (
-          <SafariBrowser
-            key={browser.id}
-            id={browser.id}
-            initialUrl={browser.url}
-            initialPosition={browser.position}
-            initialScale={browser.scale}
-            onClose={() => closeBrowser(browser.id)}
-          />
-        ))}
+                        {/* ================= INTRO WELCOME PANEL ================= */}
+                        <div className="flex flex-col justify-center items-center gap-10">
+                          {!hasStarted && !isMobile && (
+                            <div className="w-200 p-5 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl text-center text-white font-sans flex justify-between items-center gap-6 animate-fade-in">
+                              <h1 className="text-2xl font-semibold tracking-wide text-white/90">
+                                Apple Vision Pro
+                              </h1>
 
-        {/* Custom Camera Controller replaces OrbitControls for jitter-free pan/parallax */}
+                              <div className="flex w-1/2 justify-between items-center gap-4">
+                                <p className="text-sm text-neutral-400 text-nowrap">
+                                  {isLoaded ? "🟢 Tracking Ready" : error ? `🔴 Error: ${error}` : "⏳ Loading AI Model..."}
+                                </p>
+
+                                {isLoaded && (
+                                  <button
+                                    onClick={() => setHasStarted(true)}
+                                    className="w-full py-3.5 px-6 rounded-full bg-white text-black font-medium tracking-wide text-sm shadow-lg hover:bg-white/50 active:scale-95 transition-all duration-200"
+                                  >
+                                    Let's Start
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {!isMobile && <div className="animate-fade-in">
+                            {/* <TestPanel /> */}
+                            <MainScene
+                              activeEnv={activeEnv}
+                              setActiveEnv={setActiveEnv}
+                              spawnBrowser={spawnBrowser}
+                            />
+                          </div>}
+                        </div>
+
+                      </div>
+                    </ApplicationContext.Provider>
+                  </SceneContext.Provider>
+                </HandTrackingContext.Provider>
+              </Html>
+
+              <HandVisualizer />
+              {browsers.map((browser) => (
+                <SafariBrowser
+                  key={browser.id}
+                  id={browser.id}
+                  initialUrl={browser.url}
+                  initialPosition={browser.position}
+                  initialScale={browser.scale}
+                  onClose={() => closeBrowser(browser.id)}
+                />
+              ))}
+
+              {spatialCreatorOpen && (
+                <SpatialCreator
+                  selectedPrimitive={spatialCreatorShape}
+                  openPanel="SpatialCreator"
+                />
+              )}
+
+            </ApplicationContext.Provider>
+          </SceneContext.Provider>
+        </HandTrackingContext.Provider>
       </Canvas>
 
       {/* Global High-Performance DOM Cursors rendered outside of Canvas to bypass any transformed Drei/Iframe occlusion */}
