@@ -10,7 +10,7 @@ interface HandTrackingContextType {
   error: string | null;
 }
 
-const HandTrackingContext = createContext<HandTrackingContextType | undefined>(undefined);
+export const HandTrackingContext = createContext<HandTrackingContextType | undefined>(undefined);
 
 export function HandTrackingProvider({ children }: { children: React.ReactNode }) {
   const [hands, setHands] = useState<any[]>([]);
@@ -47,12 +47,12 @@ export function HandTrackingProvider({ children }: { children: React.ReactNode }
 
         await tf.setBackend('webgl');
         await tf.ready();
-        
+
         detectorRef.current = await handPoseDetection.createDetector(
           handPoseDetection.SupportedModels.MediaPipeHands,
-          { 
-            runtime: 'mediapipe', 
-            modelType: 'lite', 
+          {
+            runtime: 'mediapipe',
+            modelType: 'lite',
             maxHands: 2,
             solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands'
           }
@@ -98,11 +98,11 @@ export function HandTrackingProvider({ children }: { children: React.ReactNode }
         try {
           const detectedHands = await detectorRef.current.estimateHands(videoRef.current);
           handsRef.current = detectedHands;
-          
+
           if (detectedHands.length > 0 && Math.random() < 0.01) {
-            console.log('Hand Detected:', detectedHands[0].keypoints3D[0]);
+            console.log('Hand Detected:', detectedHands[0].keypoints3D?.[0]);
           }
-          
+
           // Only update React state occasionally for UI (e.g., 10 FPS), not every frame
           if (time - lastTimeRef.current > 100) {
             setHands(detectedHands);

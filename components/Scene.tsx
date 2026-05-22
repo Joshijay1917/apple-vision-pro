@@ -1,32 +1,49 @@
-import { useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Environment, OrbitControls, Html } from "@react-three/drei";
-import AppIcon from "./AppIcon";
-import { CirclePlay, Mountain, Users } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Environment, Html, PointerLockControls } from "@react-three/drei";
 import * as THREE from 'three'
-import { useHandTracking } from "../context/HandTrackingContext";
+import { useHandTracking } from "@/context/HandTrackingContext";
+import { useScene } from "@/context/SceneContext";
 import MainScene from "./3dScene/MainScene";
 import { HandVisualizer } from "./3dScene/HandVisulizer";
-import TestPanel from "./3dScene/TestPanel";
+import SpatialCreator from "./3dScene/Applications/SpatialCreator/SpatialCreator";
+import { useApplication } from "@/context/ApplicationContext";
+import SafariBrowser from "./3dScene/Applications/Safari/SafariBrowser";
+
 
 export default function Scene() {
   const [hasStarted, setHasStarted] = useState(false);
-  const { hands, isLoaded, error } = useHandTracking();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const trackingValue = useHandTracking();
+  const { hands, isLoaded, error } = trackingValue;
+  const { activeEnv, setActiveEnv } = useScene();
+  const { browsers, spawnBrowser, closeBrowser } = useApplication();
   const [status, setStatus] = useState("Initializing...");
 
-  function FadingEnvironment({ files }: { files: any }) {
-    // Lerp speed: higher = faster fade, lower = slower fade
-    const fadeSpeed = 0.03;
 
-    useFrame((state, delta) => {
+  function FadingEnvironment({ files }: { files: any }) {
+    const fadeSpeed = 0.03;
+    const prevFilesRef = useRef(files);
+
+    useFrame((state) => {
       const scene = state.scene;
 
-      // Initialize backgroundIntensity if not set
+      // When files change, reset backgroundIntensity to 0 to trigger a beautiful fade-in!
+      if (prevFilesRef.current !== files) {
+        scene.backgroundIntensity = 0;
+        prevFilesRef.current = files;
+      }
+
       if (scene.backgroundIntensity === undefined) {
         scene.backgroundIntensity = 0;
       }
 
-      // Only update if we haven't reached the target to save GPU cycles
       if (scene.backgroundIntensity < 0.99) {
         scene.backgroundIntensity = THREE.MathUtils.lerp(
           scene.backgroundIntensity,
@@ -43,7 +60,7 @@ export default function Scene() {
 
   return (
     // The outermost container stays pure black initially, or updates when started
-    <div className="absolute inset-0 z-0 bg-black transition-colors duration-1000">
+    <div className="absolute inset-0 z-0 bg-black transition-colors duration-1000 select-none touch-none">
       <Canvas
         camera={{ position: [0, 0, 0.1], fov: 75 }}
         gl={{
@@ -54,13 +71,15 @@ export default function Scene() {
           depth: true
         }}
       >
+
+        <PointerLockControls />
         <ambientLight intensity={1.5} />
         <pointLight position={[0, 0, 1]} intensity={2} />
 
         {/* 1. HDRI ENVIRONMENT: Only renders when started so it fades in naturally */}
         {hasStarted && (
           <FadingEnvironment
-            files="/hdri.jpg"
+            files={activeEnv}
           />
         )}
 
@@ -69,20 +88,21 @@ export default function Scene() {
           position={[0, 0, -4]}
           transform
           distanceFactor={2.5}
+          pointerEvents="auto"
         >
           {/* Global wrapper with a smooth CSS opacity fade transition */}
           <div className="transition-opacity duration-1000 ease-in-out">
 
             {/* ================= INTRO WELCOME PANEL ================= */}
-            {!hasStarted ? (
-              <div className="flex justify-center items-center gap-4">
-                <div className="w-80 p-8 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl text-center text-white font-sans flex flex-col items-center gap-6 animate-fade-in">
+            <div className="flex flex-col justify-center items-center gap-10">
+              {!hasStarted && (
+                <div className="w-200 p-5 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl text-center text-white font-sans flex justify-between items-center gap-6 animate-fade-in">
                   <h1 className="text-2xl font-semibold tracking-wide text-white/90">
                     Apple Vision Pro
                   </h1>
 
-                  <div className="flex flex-col items-center gap-4">
-                    <p className="text-sm text-neutral-400">
+                  <div className="flex w-1/2 justify-between items-center gap-4">
+                    <p className="text-sm text-neutral-400 text-nowrap">
                       {isLoaded ? "🟢 Tracking Ready" : error ? `🔴 Error: ${error}` : "⏳ Loading AI Model..."}
                     </p>
 
@@ -96,25 +116,55 @@ export default function Scene() {
                     )}
                   </div>
                 </div>
-                <div className="animate-fade-in">
-                  {/* <TestPanel /> */}
-                  <MainScene />
-                </div>
+              )}
+              <div className="animate-fade-in">
+                {/* <TestPanel /> */}
+                <MainScene
+                  activeEnv={activeEnv}
+                  setActiveEnv={setActiveEnv}
+                  spawnBrowser={spawnBrowser}
+                />
               </div>
-            ) : <MainScene />
-            }
+            </div>
 
           </div>
         </Html>
 
         <HandVisualizer />
+        {browsers.map((browser) => (
+          <SafariBrowser
+            key={browser.id}
+            id={browser.id}
+            initialUrl={browser.url}
+            initialPosition={browser.position}
+            initialScale={browser.scale}
+            onClose={() => closeBrowser(browser.id)}
+          />
+        ))}
 
-        <OrbitControls
-          enableZoom={false}
-          enablePan={false}
-          rotateSpeed={-0.4}
-        />
+        {/* Custom Camera Controller replaces OrbitControls for jitter-free pan/parallax */}
       </Canvas>
+
+      {/* Global High-Performance DOM Cursors rendered outside of Canvas to bypass any transformed Drei/Iframe occlusion */}
+      {mounted && createPortal(
+        <>
+          <div
+            id="spatial-cursor-0"
+            className="fixed w-8 h-8 rounded-full border-[2.5px] border-white bg-white/10 shadow-[0_0_12px_rgba(255,255,255,0.45)] transition-all duration-75 ease-out flex items-center justify-center pointer-events-none"
+            style={{ opacity: 0, left: 0, top: 0, transform: 'translate3d(0, 0, 0) translate(-50%, -50%)', zIndex: 999999 }}
+          >
+            <div className="w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_4px_rgba(255,255,255,0.8)]" />
+          </div>
+          <div
+            id="spatial-cursor-1"
+            className="fixed w-8 h-8 rounded-full border-[2.5px] border-white bg-white/10 shadow-[0_0_12px_rgba(255,255,255,0.45)] transition-all duration-75 ease-out flex items-center justify-center pointer-events-none"
+            style={{ opacity: 0, left: 0, top: 0, transform: 'translate3d(0, 0, 0) translate(-50%, -50%)', zIndex: 999999 }}
+          >
+            <div className="w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_4px_rgba(255,255,255,0.8)]" />
+          </div>
+        </>,
+        document.body
+      )}
     </div>
   );
 }
