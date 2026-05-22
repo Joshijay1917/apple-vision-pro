@@ -21,7 +21,7 @@ const BONE_COUNT = BONE_PAIRS.length;
 const MAX_HANDS = 2;
 
 export function HandVisualizer() {
-  const { handsRef } = useHandTracking();
+  const { handsRef, isMobile } = useHandTracking();
   const { focusedBrowserId } = useApplication();
   const jointMeshRef = useRef<THREE.InstancedMesh>(null);
   const boneMeshRef = useRef<THREE.InstancedMesh>(null);
@@ -126,12 +126,12 @@ export function HandVisualizer() {
       if (!keypoints3D || !keypoints2D || keypoints3D.length < 21 || !keypoints2D[0]) continue;
 
       // Calculate the hand's center in screen space (-0.5 to 0.5)
-      // Mirror the X because webcams are mirrored
       const screenX = (keypoints2D[0].x / 640) - 0.5;
       const screenY = (keypoints2D[0].y / 480) - 0.5;
 
       // Map screen space to 3D world space at the current offsetZ
-      const worldOffsetX = -screenX * viewWidth * 2; // Inverted for mirror
+      // Inverted for mirror on desktop, straight on mobile back camera
+      const worldOffsetX = (isMobile ? screenX : -screenX) * viewWidth * 2;
       const worldOffsetY = -screenY * viewHeight * 2;
 
       // 1. Update Joints with Anti-Jitter Exponential Moving Average (EMA)
@@ -140,7 +140,7 @@ export function HandVisualizer() {
         const idx = h * JOINT_COUNT + i;
 
         // Calculate raw target 3D space position
-        const targetX = -kp.x * scale + worldOffsetX;
+        const targetX = (isMobile ? kp.x : -kp.x) * scale + worldOffsetX;
         const targetY = -kp.y * scale + worldOffsetY + offsetY;
         const targetZ = kp.z * scale + offsetZ;
 

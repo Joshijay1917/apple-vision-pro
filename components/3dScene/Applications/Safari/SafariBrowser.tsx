@@ -26,7 +26,7 @@ export default function SafariBrowser({
   initialScale,
   onClose
 }: SafariBrowserProps) {
-  const { handsRef } = useHandTracking();
+  const { handsRef, isMobile } = useHandTracking();
   const { focusedBrowserId, setFocusedBrowserId, updateBrowserURL } = useApplication();
   
   const groupRef = useRef<THREE.Group>(null);
@@ -128,12 +128,12 @@ export default function SafariBrowser({
     if (leftHand?.keypoints3D?.[4] && leftHand?.keypoints3D?.[8] && leftHand?.keypoints?.[0]) {
       const screenX = (leftHand.keypoints[0].x / 640) - 0.5;
       const screenY = (leftHand.keypoints[0].y / 480) - 0.5;
-      const wOffsetX = -screenX * viewWidth * 2;
+      const wOffsetX = (isMobile ? screenX : -screenX) * viewWidth * 2;
       const wOffsetY = -screenY * viewHeight * 2;
       const thumb = leftHand.keypoints3D[4];
       const index = leftHand.keypoints3D[8];
-      const thumbVec = new THREE.Vector3(-thumb.x * scaleFactor + wOffsetX, -thumb.y * scaleFactor + wOffsetY + offsetY, thumb.z * scaleFactor + offsetZ);
-      const indexVec = new THREE.Vector3(-index.x * scaleFactor + wOffsetX, -index.y * scaleFactor + wOffsetY + offsetY, index.z * scaleFactor + offsetZ);
+      const thumbVec = new THREE.Vector3((isMobile ? thumb.x : -thumb.x) * scaleFactor + wOffsetX, -thumb.y * scaleFactor + wOffsetY + offsetY, thumb.z * scaleFactor + offsetZ);
+      const indexVec = new THREE.Vector3((isMobile ? index.x : -index.x) * scaleFactor + wOffsetX, -index.y * scaleFactor + wOffsetY + offsetY, index.z * scaleFactor + offsetZ);
       
       if (thumbVec.distanceTo(indexVec) < 0.25) {
         handIndex = 0; // Left
@@ -146,12 +146,12 @@ export default function SafariBrowser({
       if (rightHand?.keypoints3D?.[4] && rightHand?.keypoints3D?.[8] && rightHand?.keypoints?.[0]) {
         const screenX = (rightHand.keypoints[0].x / 640) - 0.5;
         const screenY = (rightHand.keypoints[0].y / 480) - 0.5;
-        const wOffsetX = -screenX * viewWidth * 2;
+        const wOffsetX = (isMobile ? screenX : -screenX) * viewWidth * 2;
         const wOffsetY = -screenY * viewHeight * 2;
         const thumb = rightHand.keypoints3D[4];
         const index = rightHand.keypoints3D[8];
-        const thumbVec = new THREE.Vector3(-thumb.x * scaleFactor + wOffsetX, -thumb.y * scaleFactor + wOffsetY + offsetY, thumb.z * scaleFactor + offsetZ);
-        const indexVec = new THREE.Vector3(-index.x * scaleFactor + wOffsetX, -index.y * scaleFactor + wOffsetY + offsetY, index.z * scaleFactor + offsetZ);
+        const thumbVec = new THREE.Vector3((isMobile ? thumb.x : -thumb.x) * scaleFactor + wOffsetX, -thumb.y * scaleFactor + wOffsetY + offsetY, thumb.z * scaleFactor + offsetZ);
+        const indexVec = new THREE.Vector3((isMobile ? index.x : -index.x) * scaleFactor + wOffsetX, -index.y * scaleFactor + wOffsetY + offsetY, index.z * scaleFactor + offsetZ);
         
         if (thumbVec.distanceTo(indexVec) < 0.25) {
           handIndex = 1; // Right
@@ -231,12 +231,12 @@ export default function SafariBrowser({
     if (leftHand?.keypoints3D?.[4] && leftHand?.keypoints3D?.[8] && leftHand?.keypoints?.[0]) {
       const screenX = (leftHand.keypoints[0].x / 640) - 0.5;
       const screenY = (leftHand.keypoints[0].y / 480) - 0.5;
-      const wOffsetX = -screenX * viewWidth * 2;
+      const wOffsetX = (isMobile ? screenX : -screenX) * viewWidth * 2;
       const wOffsetY = -screenY * viewHeight * 2;
       const thumb = leftHand.keypoints3D[4];
       const index = leftHand.keypoints3D[8];
-      const thumbVec = new THREE.Vector3(-thumb.x * scaleFactor + wOffsetX, -thumb.y * scaleFactor + wOffsetY + offsetY, thumb.z * scaleFactor + offsetZ);
-      const indexVec = new THREE.Vector3(-index.x * scaleFactor + wOffsetX, -index.y * scaleFactor + wOffsetY + offsetY, index.z * scaleFactor + offsetZ);
+      const thumbVec = new THREE.Vector3((isMobile ? thumb.x : -thumb.x) * scaleFactor + wOffsetX, -thumb.y * scaleFactor + wOffsetY + offsetY, thumb.z * scaleFactor + offsetZ);
+      const indexVec = new THREE.Vector3((isMobile ? index.x : -index.x) * scaleFactor + wOffsetX, -index.y * scaleFactor + wOffsetY + offsetY, index.z * scaleFactor + offsetZ);
       
       isLeftPinching = thumbVec.distanceTo(indexVec) < 0.25;
       leftPinchPos.addVectors(thumbVec, indexVec).multiplyScalar(0.5);
@@ -246,12 +246,12 @@ export default function SafariBrowser({
     if (rightHand?.keypoints3D?.[4] && rightHand?.keypoints3D?.[8] && rightHand?.keypoints?.[0]) {
       const screenX = (rightHand.keypoints[0].x / 640) - 0.5;
       const screenY = (rightHand.keypoints[0].y / 480) - 0.5;
-      const wOffsetX = -screenX * viewWidth * 2;
+      const wOffsetX = (isMobile ? screenX : -screenX) * viewWidth * 2;
       const wOffsetY = -screenY * viewHeight * 2;
       const thumb = rightHand.keypoints3D[4];
       const index = rightHand.keypoints3D[8];
-      const thumbVec = new THREE.Vector3(-thumb.x * scaleFactor + wOffsetX, -thumb.y * scaleFactor + wOffsetY + offsetY, thumb.z * scaleFactor + offsetZ);
-      const indexVec = new THREE.Vector3(-index.x * scaleFactor + wOffsetX, -index.y * scaleFactor + wOffsetY + offsetY, index.z * scaleFactor + offsetZ);
+      const thumbVec = new THREE.Vector3((isMobile ? thumb.x : -thumb.x) * scaleFactor + wOffsetX, -thumb.y * scaleFactor + wOffsetY + offsetY, thumb.z * scaleFactor + offsetZ);
+      const indexVec = new THREE.Vector3((isMobile ? index.x : -index.x) * scaleFactor + wOffsetX, -index.y * scaleFactor + wOffsetY + offsetY, index.z * scaleFactor + offsetZ);
       
       isRightPinching = thumbVec.distanceTo(indexVec) < 0.25;
       rightPinchPos.addVectors(thumbVec, indexVec).multiplyScalar(0.5);

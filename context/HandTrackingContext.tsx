@@ -8,6 +8,7 @@ interface HandTrackingContextType {
   isLoaded: boolean;
   stream: MediaStream | null;
   error: string | null;
+  isMobile: boolean;
 }
 
 export const HandTrackingContext = createContext<HandTrackingContextType | undefined>(undefined);
@@ -18,6 +19,7 @@ export function HandTrackingProvider({ children }: { children: React.ReactNode }
   const [isLoaded, setIsLoaded] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   const handsRef = useRef<any[]>([]);
   const detectorRef = useRef<any>(null);
@@ -29,6 +31,9 @@ export function HandTrackingProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     async function init() {
       try {
+        const mobileCheck = window.innerWidth < 1024 || /Mobi|Android|iPhone/i.test(navigator.userAgent);
+        setIsMobile(mobileCheck);
+
         const waitForGlobals = async () => {
           let attempts = 0;
           while (attempts < 50) {
@@ -58,10 +63,20 @@ export function HandTrackingProvider({ children }: { children: React.ReactNode }
           }
         );
 
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480, facingMode: 'user' },
-          audio: false,
-        });
+        const constraints = mobileCheck ? {
+          video: {
+            facingMode: { exact: "environment" },
+            width: { ideal: 640 }, // Keep it lightweight for the Web Worker!
+            height: { ideal: 480 },
+            frameRate: { ideal: 30 }
+          },
+          audio: false
+        } : {
+          video: { facingMode: "user" },
+          audio: false
+        };
+
+        const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
         streamRef.current = mediaStream;
         setStream(mediaStream);
 
@@ -117,7 +132,7 @@ export function HandTrackingProvider({ children }: { children: React.ReactNode }
   };
 
   return (
-    <HandTrackingContext.Provider value={{ hands, handsRef, isLoaded, stream, error }}>
+    <HandTrackingContext.Provider value={{ hands, handsRef, isLoaded, stream, error, isMobile }}>
       {children}
     </HandTrackingContext.Provider>
   );
