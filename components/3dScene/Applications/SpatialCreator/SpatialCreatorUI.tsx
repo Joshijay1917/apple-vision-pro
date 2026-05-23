@@ -10,7 +10,7 @@ export default function SpatialCreatorUI({
     const { spatialCreatorShape, setSpatialCreatorShape } = useApplication();
 
     return (
-        <div className="flex flex-col items-center gap-4 p-6 rounded-3xl bg-gray-950/5 border border-white/10 shadow-2xl animate-fade-in min-w-[380px] text-center pointer-events-auto">
+        <div className="flex flex-col items-center gap-4 p-6 rounded-3xl bg-gray-950/90 border border-white/10 shadow-2xl animate-fade-in min-w-[380px] text-center pointer-events-auto">
             <div className="flex w-full justify-between items-center border-b border-white/10 pb-3 mb-2">
                 <h3 className="text-sm font-semibold tracking-wider text-white">Spatial Object Creator</h3>
                 <button

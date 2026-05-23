@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useMemo, useState, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { createPortal } from "react-dom";
 import { Environment, Html, PointerLockControls } from "@react-three/drei";
@@ -13,6 +13,52 @@ import SafariBrowser from "./3dScene/Applications/Safari/SafariBrowser";
 import { StereoRenderer } from "./3dScene/StereoRenderer";
 import { DeviceOrientationController } from "./3dScene/DeviceOrientationController";
 
+// Module-level stable component — geometry & material allocated once per mount, zero GC pressure
+function StarField() {
+  const pointsRef = useRef<THREE.Points>(null);
+
+  const geometry = useMemo(() => {
+    const STAR_COUNT = 700;
+    const positions = new Float32Array(STAR_COUNT * 3);
+    for (let i = 0; i < STAR_COUNT; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      const r = 80 + Math.random() * 40;
+      positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      positions[i * 3 + 2] = r * Math.cos(phi);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    return geo;
+  }, []);
+
+  const material = useMemo(
+    () =>
+      new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.35,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false,
+      }),
+    []
+  );
+
+  useFrame((_, delta) => {
+    if (!pointsRef.current) return;
+    pointsRef.current.rotation.y += delta * 0.008;
+    pointsRef.current.rotation.x += delta * 0.003;
+    // Gentle twinkle: oscillate opacity cheaply, no texture needed
+    material.opacity = 0.65 + 0.2 * Math.sin(performance.now() * 0.001 * 1.4);
+  });
+
+  return (
+    <points ref={pointsRef} geometry={geometry} material={material} frustumCulled={false} />
+  );
+}
+
 
 export default function Scene() {
   const [hasStarted, setHasStarted] = useState(false);
@@ -22,21 +68,8 @@ export default function Scene() {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    const handleCanvasClick = (e: MouseEvent) => {
-      // Only lock pointer if it is a genuine, trusted user gesture click
-      if (e.isTrusted) {
-        const canvas = document.querySelector('canvas');
-        if (canvas && e.target === canvas) {
-          canvas.requestPointerLock();
-        }
-      }
-    };
-    document.addEventListener('click', handleCanvasClick);
-    return () => {
-      document.removeEventListener('click', handleCanvasClick);
-    };
-  }, []);
+  // PointerLockControls (drei) handles locking natively on canvas click.
+  // No manual requestPointerLock needed — it competed with drei's own handler.
 
   const trackingValue = useHandTracking();
   const { hands, isLoaded, error, isMobile } = trackingValue;
@@ -48,6 +81,8 @@ export default function Scene() {
   const [isVRActive, setIsVRActive] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
 
+
+  // Lightweight 360° star field removed from inner scope — now lives at module level above
 
   function FadingEnvironment({ files }: { files: any }) {
     const fadeSpeed = 0.03;
@@ -97,7 +132,7 @@ export default function Scene() {
           <SceneContext.Provider value={sceneValue}>
             <ApplicationContext.Provider value={appValue}>
 
-              {!isMobile && <PointerLockControls selector="#none" />}
+              {!isMobile && <PointerLockControls />}
               {isMobile && isVRActive && (
                 <>
                   <StereoRenderer />
@@ -108,10 +143,11 @@ export default function Scene() {
               <pointLight position={[0, 0, 1]} intensity={pointIntensity} />
 
               {/* 1. HDRI ENVIRONMENT: Only renders when started so it fades in naturally */}
-              {hasStarted && (
-                <FadingEnvironment
-                  files={activeEnv}
-                />
+              {hasStarted ? (
+                <FadingEnvironment files={activeEnv} />
+              ) : (
+                /* Minimal 360° star field shown on the loading/welcome screen */
+                <StarField />
               )}
 
               {/* 2. THE FLOATING INTERFACE */}
@@ -124,9 +160,11 @@ export default function Scene() {
                 <HandTrackingContext.Provider value={trackingValue}>
                   <SceneContext.Provider value={sceneValue}>
                     <ApplicationContext.Provider value={appValue}>
-                      {/* Global wrapper with a smooth CSS opacity fade transition */}
+                      {/* Global wrapper with a smooth CSS opacity fade transition.
+                           NOTE: We intentionally do NOT stopPropagation on onClick here.
+                           Stopping onClick would prevent canvas clicks from reaching
+                           PointerLockControls, breaking pointer lock after hasStarted. */}
                       <div
-                        onClick={(e) => e.stopPropagation()}
                         onPointerDown={(e) => e.stopPropagation()}
                         onPointerUp={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
@@ -201,6 +239,47 @@ export default function Scene() {
       {/* Global High-Performance DOM Cursors rendered outside of Canvas to bypass any transformed Drei/Iframe occlusion */}
       {mounted && createPortal(
         <>
+          {/* DOM Hand Skeleton Overlay */}
+          <div
+            id="spatial-hand-skeleton-overlay"
+            className="fixed inset-0 pointer-events-none"
+            style={{ zIndex: 999998 }}
+          >
+            {/* SVG bones layer */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+              {Array.from({ length: 2 }).map((_, h) =>
+                Array.from({ length: 22 }).map((_, j) => (
+                  <line
+                    key={`hand-${h}-bone-${j}`}
+                    id={`hand-${h}-bone-${j}`}
+                    stroke="rgba(255, 255, 255, 0.45)"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    style={{ opacity: 0, transition: 'opacity 0.15s ease' }}
+                  />
+                ))
+              )}
+            </svg>
+
+            {/* Joint circles layer */}
+            {Array.from({ length: 2 }).map((_, h) =>
+              Array.from({ length: 21 }).map((_, i) => (
+                <div
+                  key={`hand-${h}-joint-${i}`}
+                  id={`hand-${h}-joint-${i}`}
+                  className="absolute w-[13px] h-[13px] rounded-full border-[1.5px] border-white/60 bg-white/40 shadow-[0_0_6px_rgba(255,255,255,0.5)] pointer-events-none"
+                  style={{
+                    opacity: 0,
+                    left: 0,
+                    top: 0,
+                    transform: 'translate3d(0,0,0) translate(-50%, -50%)',
+                    transition: 'opacity 0.15s ease'
+                  }}
+                />
+              ))
+            )}
+          </div>
+
           <div
             id="spatial-cursor-0"
             className="fixed w-8 h-8 rounded-full border-[2.5px] border-white bg-white/10 shadow-[0_0_12px_rgba(255,255,255,0.45)] transition-all duration-75 ease-out flex items-center justify-center pointer-events-none"

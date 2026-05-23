@@ -84,6 +84,18 @@ export function HandVisualizer() {
       smoothingRef.current[0].origin.set(0, 0, 0);
       smoothingRef.current[1].origin.set(0, 0, 0);
 
+      // Hide all DOM skeleton parts when hands are lost
+      for (let h = 0; h < MAX_HANDS; h++) {
+        for (let i = 0; i < JOINT_COUNT; i++) {
+          const jointDom = document.getElementById(`hand-${h}-joint-${i}`);
+          if (jointDom) jointDom.style.opacity = '0';
+        }
+        for (let j = 0; j < BONE_COUNT; j++) {
+          const boneDom = document.getElementById(`hand-${h}-bone-${j}`);
+          if (boneDom) boneDom.style.opacity = '0';
+        }
+      }
+
       for (let h = 0; h < MAX_HANDS; h++) {
         smoothedCursorPosRef.current[h].set(0, 0, 0);
         for (let i = 0; i < JOINT_COUNT; i++) {
@@ -107,8 +119,9 @@ export function HandVisualizer() {
       return;
     }
 
-    jointMeshRef.current.count = handSkeletonVisible ? hands.length * JOINT_COUNT : 0;
-    boneMeshRef.current.count = handSkeletonVisible ? hands.length * BONE_COUNT : 0;
+    // Set WebGL joint and bone mesh counts to 0 to disable them in canvas (using superior DOM skeleton)
+    jointMeshRef.current.count = 0;
+    boneMeshRef.current.count = 0;
     cursorMeshRef.current.count = hands.length;
 
     // Config for Vision Pro style placement
@@ -157,23 +170,57 @@ export function HandVisualizer() {
           smoothedPos.lerp(vStart, 0.16);
         }
 
+        // Project the joint's 3D position to 2D screen NDC coordinates
+        const ndcJoint = smoothedPos.clone().project(state.camera);
+        const screenXPixel = (ndcJoint.x + 1) / 2 * window.innerWidth;
+        const screenYPixel = -(ndcJoint.y - 1) / 2 * window.innerHeight;
+
+        // Update joint DOM element
+        const jointDom = document.getElementById(`hand-${h}-joint-${i}`);
+        if (jointDom) {
+          jointDom.style.transform = `translate3d(${screenXPixel}px, ${screenYPixel}px, 0) translate(-50%, -50%)`;
+          jointDom.style.opacity = handSkeletonVisible ? '1' : '0';
+        }
+
         tempObject.position.copy(smoothedPos);
         tempObject.scale.set(1, 1, 1);
         tempObject.rotation.set(0, 0, 0);
         tempObject.updateMatrix();
-        jointMeshRef.current.setMatrixAt(idx, tempObject.matrix);
+        jointMeshRef.current.setMatrixAt(h * JOINT_COUNT + i, tempObject.matrix);
       }
 
+      // 2. Update Bones using the smoothed joints
       // 2. Update Bones using the smoothed joints
       for (let j = 0; j < BONE_COUNT; j++) {
         const [startIdx, endIdx] = BONE_PAIRS[j];
 
-        vStart.copy(smoothedJointsRef.current[h][startIdx]);
-        vEnd.copy(smoothedJointsRef.current[h][endIdx]);
+        const pStart = smoothedJointsRef.current[h][startIdx];
+        const pEnd = smoothedJointsRef.current[h][endIdx];
 
+        // Project both joint positions to 2D screen coordinates
+        const ndcStart = pStart.clone().project(state.camera);
+        const ndcEnd = pEnd.clone().project(state.camera);
+
+        const xStart = (ndcStart.x + 1) / 2 * window.innerWidth;
+        const yStart = -(ndcStart.y - 1) / 2 * window.innerHeight;
+
+        const xEnd = (ndcEnd.x + 1) / 2 * window.innerWidth;
+        const yEnd = -(ndcEnd.y - 1) / 2 * window.innerHeight;
+
+        // Update SVG line bone element
+        const boneDom = document.getElementById(`hand-${h}-bone-${j}`) as unknown as SVGLineElement;
+        if (boneDom) {
+          boneDom.setAttribute('x1', xStart.toString());
+          boneDom.setAttribute('y1', yStart.toString());
+          boneDom.setAttribute('x2', xEnd.toString());
+          boneDom.setAttribute('y2', yEnd.toString());
+          boneDom.style.opacity = handSkeletonVisible ? '1' : '0';
+        }
+
+        vStart.copy(pStart);
+        vEnd.copy(pEnd);
         const dist = vStart.distanceTo(vEnd);
         if (dist < 0.0001) continue;
-
         vDir.subVectors(vEnd, vStart).normalize();
 
         tempObject.position.copy(vStart).add(vEnd).multiplyScalar(0.5);
@@ -225,7 +272,7 @@ export function HandVisualizer() {
           targetZ = browserObj.position.z;
         }
       }
-      
+
       const uiPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -targetZ);
       const ray = new THREE.Ray(smoothed.origin, smoothed.dir);
       const intersectPoint = new THREE.Vector3();
@@ -266,34 +313,139 @@ export function HandVisualizer() {
         const domY = -(ndcPoint.y - 1) / 2 * window.innerHeight;
 
         // Find the topmost actual HTML DOM element at this specific screen coordinate
-        const element = document.elementFromPoint(domX, domY);
+        let element = document.elementFromPoint(domX, domY);
+        let targetElement = element;
+        let finalDomX = domX;
+        let finalDomY = domY;
+
+        let iframeElement: HTMLIFrameElement | null = null;
+        if (element) {
+          if (element.tagName === 'IFRAME') {
+            iframeElement = element as HTMLIFrameElement;
+          } else {
+            // Restrict iframe search to prevent hijacking navigation controls, buttons, forms, and drag handles
+            const isControlOrHandle = element.closest('.h-16') || element.closest('.cursor-grab') || element.closest('form');
+            if (!isControlOrHandle) {
+              iframeElement = element.querySelector('iframe') || null;
+            }
+          }
+        }
+
+        if (isPinching && !isPinchingRef.current[h]) {
+          console.log("[HandVisualizer] --- New Pinch Gesture Triggered ---");
+          console.log("[HandVisualizer] DOM Element detected at pointer point:", element);
+          console.log("[HandVisualizer] Resolved iframe target element:", iframeElement);
+        }
+
+        if (iframeElement) {
+          const iframe = iframeElement;
+          let isSameOrigin = false;
+          try {
+            // Attempt to read location.href to actively test CORS boundaries
+            if (iframe.contentDocument && iframe.contentDocument.location.href) {
+              isSameOrigin = true;
+            }
+          } catch (e) {
+            isSameOrigin = false;
+          }
+
+          if (isSameOrigin) {
+            if (isPinching && !isPinchingRef.current[h]) {
+              console.log("[HandVisualizer] Iframe contentDocument is accessible (Same-Origin). Translating click...");
+            }
+            const rect = iframe.getBoundingClientRect();
+            const localX = domX - rect.left;
+            const localY = domY - rect.top;
+
+            const innerElement = iframe.contentDocument!.elementFromPoint(localX, localY);
+            if (isPinching && !isPinchingRef.current[h]) {
+              console.log("[HandVisualizer] Local Projected Coordinates inside Same-Origin IFrame:", { localX, localY });
+              console.log("[HandVisualizer] Projected Inner DOM Target Element:", innerElement);
+            }
+            if (innerElement) {
+              targetElement = innerElement;
+              finalDomX = localX;
+              finalDomY = localY;
+            }
+          } else {
+            if (isPinching && !isPinchingRef.current[h]) {
+              console.log("[HandVisualizer] Cross-Origin Iframe boundary intercepted (Access blocked).");
+            }
+            // Cross-origin YouTube embed playback toggle
+            if (isPinching && !isPinchingRef.current[h]) {
+              const src = iframe.src || '';
+              if (src.includes('youtube.com') || src.includes('youtu.be')) {
+                const isPlaying = iframe.getAttribute('data-playing') === 'true';
+                const command = isPlaying ? 'pauseVideo' : 'playVideo';
+                
+                const targetOrigin = src.startsWith('https://') ? new URL(src).origin : '*';
+                console.log(`[HandVisualizer] YouTube cross-origin iframe matching! src: "${src}", data-playing: "${isPlaying}". Dispatching command: "${command}" to origin: "${targetOrigin}"`);
+                
+                // Define multiple payload variants (args as array, args as empty string, and omitting args) to satisfy all player configurations
+                const payloads = [
+                  { event: 'command', func: command, args: [] },
+                  { event: 'command', func: command, args: '' },
+                  { event: 'command', func: command }
+                ];
+                
+                // Dispatch all payload types in both raw object and stringified formats
+                payloads.forEach((payload, index) => {
+                  const payloadStr = JSON.stringify(payload);
+                  console.log(`[HandVisualizer] Sending postMessage payload #${index + 1}:`, payload);
+                  
+                  iframe.contentWindow?.postMessage(payloadStr, '*');
+                  iframe.contentWindow?.postMessage(payload, '*');
+                  if (targetOrigin !== '*') {
+                    iframe.contentWindow?.postMessage(payloadStr, targetOrigin);
+                    iframe.contentWindow?.postMessage(payload, targetOrigin);
+                  }
+                });
+                
+                iframe.setAttribute('data-playing', isPlaying ? 'false' : 'true');
+              } else {
+                console.log("[HandVisualizer] Iframe is not a recognized YouTube URL. src:", src);
+              }
+            }
+          }
+        }
 
         // Handle Hover States (Trigger CSS :hover effects via JS and satisfy React's synthetic event listeners)
         const hoverd = hoveredElementRef.current[h];
-        if (element !== hoverd) {
+        if (targetElement !== hoverd) {
           if (hoverd) {
-            hoverd.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, clientX: domX, clientY: domY }));
-            hoverd.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false, clientX: domX, clientY: domY }));
+            hoverd.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, clientX: finalDomX, clientY: finalDomY }));
+            hoverd.dispatchEvent(new MouseEvent('mouseleave', { bubbles: false, clientX: finalDomX, clientY: finalDomY }));
           }
-          if (element) {
-            element.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: domX, clientY: domY }));
-            element.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false, clientX: domX, clientY: domY }));
-            element.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: domX, clientY: domY }));
+          if (targetElement) {
+            targetElement.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, clientX: finalDomX, clientY: finalDomY }));
+            targetElement.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false, clientX: finalDomX, clientY: finalDomY }));
+            targetElement.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: finalDomX, clientY: finalDomY }));
           }
-          hoveredElementRef.current[h] = element;
-        } else if (element) {
-          element.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: domX, clientY: domY }));
+          hoveredElementRef.current[h] = targetElement;
+        } else if (targetElement) {
+          targetElement.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: finalDomX, clientY: finalDomY }));
         }
 
         // Handle Click Event (Complete Mouse click lifecycle: mousedown -> mouseup -> click)
         if (isPinching && !isPinchingRef.current[h]) {
-          if (element) {
-            element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: domX, clientY: domY }));
+          if (targetElement) {
+            targetElement.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: finalDomX, clientY: finalDomY }));
+
+            // Explicit focus triggering for input/textarea to enable keyboard support
+            const isEditable = targetElement.tagName === 'INPUT' || targetElement.tagName === 'TEXTAREA' || targetElement.getAttribute('contenteditable') === 'true';
+            if (isEditable) {
+              (targetElement as HTMLElement).focus();
+            } else {
+              const active = document.activeElement;
+              if (active && active instanceof HTMLElement && active !== targetElement) {
+                active.blur();
+              }
+            }
           }
         } else if (!isPinching && isPinchingRef.current[h]) {
-          if (element) {
-            element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: domX, clientY: domY }));
-            element.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: domX, clientY: domY }));
+          if (targetElement) {
+            targetElement.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: finalDomX, clientY: finalDomY }));
+            targetElement.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: finalDomX, clientY: finalDomY }));
           }
         }
 
@@ -343,6 +495,18 @@ export function HandVisualizer() {
 
       // Update previous pinch state for this hand to prevent double-clicking
       isPinchingRef.current[h] = isPinching;
+    }
+
+    // If only one hand is active (or none), hide the rest of the DOM skeleton parts
+    for (let h = hands.length; h < MAX_HANDS; h++) {
+      for (let i = 0; i < JOINT_COUNT; i++) {
+        const jointDom = document.getElementById(`hand-${h}-joint-${i}`);
+        if (jointDom) jointDom.style.opacity = '0';
+      }
+      for (let j = 0; j < BONE_COUNT; j++) {
+        const boneDom = document.getElementById(`hand-${h}-bone-${j}`);
+        if (boneDom) boneDom.style.opacity = '0';
+      }
     }
 
     jointMeshRef.current.instanceMatrix.needsUpdate = true;

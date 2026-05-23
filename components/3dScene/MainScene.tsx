@@ -99,37 +99,37 @@ export default function MainScene({
               {/* Staggered Grid Configuration */}
               <div className="flex flex-col gap-8 items-center">
                 {/* ROW 1: 4 Items */}
-                <div className="flex gap-8 justify-center">
-                  <AppIcon label="TV" src="/icons/tv.png" onClick={() => triggerComingSoon("TV")} />
-                  <AppIcon label="Music" src="/icons/Music.png" onClick={() => triggerComingSoon("Music")} />
-                  <AppIcon label="Mindfulness" src="/icons/Mindfulness.png" onClick={() => triggerComingSoon("Mindfulness")} />
-                  <AppIcon label="Settings" src="/icons/settings.png" onClick={() => setSidePanelOpen("Settings")} />
+                <div className="flex gap-20 justify-center">
+                  <AppIcon label="TV" src="/icons/tv.svg" onClick={() => triggerComingSoon("TV")} />
+                  <AppIcon label="Music" src="/icons/music.svg" onClick={() => triggerComingSoon("Music")} />
+                  <AppIcon label="Mindfullness" src="/icons/mindfullness.svg" onClick={() => triggerComingSoon("Mindfulness")} />
+                  <AppIcon label="Settings" src="/icons/settings.svg" onClick={() => setSidePanelOpen("Settings")} />
                 </div>
 
                 {/* ROW 2: 5 Items */}
-                <div className="flex gap-8 justify-center">
+                <div className="flex gap-20 justify-center">
                   <AppIcon
                     label="Spatial Creator"
-                    src="/icons/freeform.png"
+                    src="/icons/freeform.svg"
                     onClick={() => setSidePanelOpen('SpatialCreator')}
                     isActive={false}
                   />
                   <AppIcon
                     label="Safari"
-                    src="/icons/safari.png"
+                    src="/icons/safari.svg"
                     onClick={() => spawnBrowser("home")}
                   />
-                  <AppIcon label="Photos" src="/icons/photos.png" onClick={() => triggerComingSoon("Photos")} />
-                  <AppIcon label="Key notes" src="/icons/Keynotes.png" onClick={() => triggerComingSoon("Key Notes")} />
-                  <AppIcon label="App Store" src="/icons/appstore.png" onClick={() => triggerComingSoon("App Store")} />
+                  <AppIcon label="Photos" src="/icons/photos.svg" onClick={() => triggerComingSoon("Photos")} />
+                  <AppIcon label="Key notes" src="/icons/kenote.svg" onClick={() => triggerComingSoon("Key Notes")} />
+                  <AppIcon label="Face Time" src="/icons/facetime.svg" onClick={() => triggerComingSoon("App Store")} />
                 </div>
 
                 {/* ROW 3: 4 Items */}
-                <div className="flex gap-8 justify-center">
-                  <AppIcon label="Mail" src="/icons/mail.png" onClick={() => triggerComingSoon("Mail")} />
-                  <AppIcon label="Messages" src="/icons/messages.png" onClick={() => triggerComingSoon("Messages")} />
-                  <AppIcon label="Notes" src="/icons/notes.png" onClick={() => triggerComingSoon("Notes")} />
-                  <AppIcon label="More Apps" src="/icons/apps.png" onClick={() => triggerComingSoon("More Apps")} />
+                <div className="flex gap-20 justify-center">
+                  <AppIcon label="Mail" src="/icons/mail.svg" onClick={() => triggerComingSoon("Mail")} />
+                  <AppIcon label="Files" src="/icons/files.svg" onClick={() => triggerComingSoon("Messages")} />
+                  <AppIcon label="Notes" src="/icons/notes.svg" onClick={() => triggerComingSoon("Notes")} />
+                  <AppIcon label="More Apps" src="/icons/other.svg" onClick={() => triggerComingSoon("More Apps")} />
                 </div>
               </div>
 

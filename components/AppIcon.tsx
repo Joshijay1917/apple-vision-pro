@@ -32,7 +32,7 @@ export default function AppIcon({
       )}
 
       {/* Icon Container with Vision Pro hover effects driven by React state */}
-      <div className={`w-16 h-16 rounded-full overflow-hidden shadow-lg transition-all duration-300 ease-out group-active:scale-95 bg-transparent ${
+      <div className={`w-22 h-22 rounded-full overflow-hidden shadow-lg transition-all duration-300 ease-out group-active:scale-95 bg-transparent ${
         isHovered || isActive ? 'scale-115 shadow-[0_0_25px_rgba(255,255,255,0.4)] ring-2 ring-white/50' : ''
       }`}>
         <img 
